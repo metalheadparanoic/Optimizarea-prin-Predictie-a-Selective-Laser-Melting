@@ -94,4 +94,4 @@ if __name__ == "__main__":
     print("scissors  Împărțire dataset (Train/Val/Test)...")
     split_and_copy()
     
-    print("\n✅ GATA! Datele au fost generate local în folderul 'data'.")
+    print("\nGATA! Datele au fost generate local în folderul 'data'.")
