@@ -63,6 +63,6 @@ Setul total de imagini va fi împărțit aleatoriu (folosind un `seed` fix pentr
 
 - [x] Structură repository configurată
 - [x] Dataset analizat (Plan EDA realizat în documentație)
-- [ ] Date preprocesate (Urmează generarea acasă/pana la urmatorul laborator)
-- [ ] Seturi train/val/test generate (Urmează generarea acasă/pana la urmatorul laborator)
+- [x] Date preprocesate (Generat local 2000 imagini sintetice SLM)
+- [x] Seturi train/val/test generate (Split automat: 70% Train, 15% Val, 15% Test)
 - [x] Documentație actualizată în README + `data/README.md`
