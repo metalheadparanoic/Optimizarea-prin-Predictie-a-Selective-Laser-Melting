@@ -1,18 +1,7 @@
 import os
 import numpy as np
-# import cv2 (va fi folosit acasa)
 
 def load_and_preprocess_image(image_path, target_size=(64, 64)):
-    """
-    Incarca o imagine, o redimensioneaza si o normalizeaza.
-    
-    Args:
-        image_path (str): Calea catre imagine.
-        target_size (tuple): Dimensiunea tinta (width, height).
-        
-    Returns:
-        np.array: Imaginea normalizata (valori 0-1).
-    """
     # TODO: Implementare cu OpenCV
     # img = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
     # img = cv2.resize(img, target_size)
