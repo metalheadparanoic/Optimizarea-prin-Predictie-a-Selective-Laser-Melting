@@ -11,6 +11,7 @@ TRAIN_DIR = os.path.join(DATA_DIR, "train")
 VAL_DIR = os.path.join(DATA_DIR, "validation")
 
 DOCS_DIR = os.path.join(PROJECT_ROOT, "docs")
+MODELS_DIR = os.path.join(PROJECT_ROOT, "models")
 
 IMG_SIZE = (64, 64)
 BATCH_SIZE = 32
@@ -82,10 +83,10 @@ def main():
     )
 
     os.makedirs(DOCS_DIR, exist_ok=True)
-    model_save_path = os.path.join(DOCS_DIR, "slm_model.keras")
+    save_path = os.path.join(MODELS_DIR, "trained_model.h5")
     
-    model.save(model_save_path)
-    print(f"Modelul antrenat a fost salvat în: {model_save_path}")
+    model.save(save_path)
+    print(f"Model antrenat salvat cu succes in: {save_path}")
 
     plot_history(history)
     print("Proces finalizat cu succes.")
