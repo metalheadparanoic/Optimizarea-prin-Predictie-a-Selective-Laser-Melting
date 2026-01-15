@@ -1,0 +1,13 @@
+model_type: "CNN"
+input_shape: [64, 64, 1]
+optimizer: "adam"
+learning_rate: 0.001
+loss_function: "binary_crossentropy"
+batch_size: 32
+epochs: 10
+callbacks:
+  - "EarlyStopping (patience=5)"
+  - "ReduceLROnPlateau"
+augmentation:
+  - "Gaussian Noise"
+  - "Lighting Variation"

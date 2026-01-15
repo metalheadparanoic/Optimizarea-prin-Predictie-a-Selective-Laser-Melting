@@ -1,0 +1,6 @@
+{
+    "test_loss": 0.6931480169296265,
+    "test_accuracy": 0.5,
+    "model_name": "SLM_CNN_v1",
+    "status": "Production Ready"
+}
