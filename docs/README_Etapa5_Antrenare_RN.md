@@ -543,9 +543,9 @@ python src/app/server.py
 ### Pre-Predare
 - [x] `docs/README_Etapa5_Antrenare_RN.md` completat cu TOATE secțiunile
 - [x] Structură repository conformă: `docs/`, `results/`, `models/` actualizate
-- [ ] Commit: `"Etapa 5 completă – Accuracy=99.33%, F1>0.99"`
-- [ ] Tag: `git tag -a v0.5-model-trained -m "Etapa 5 - Model antrenat"`
-- [ ] Push: `git push origin main --tags`
+- [x] Commit: `"Etapa 5 completă – Accuracy=99.33%, F1>0.99"`
+- [x] Tag: `git tag -a v0.5-model-trained -m "Etapa 5 - Model antrenat"`
+- [x] Push: `git push origin main --tags`
 - [x] Repository accesibil (public sau privat cu acces profesori)
 
 ---
