@@ -1,13 +1,8 @@
-model_type: "CNN"
+model_type: "CNN Custom Architecture"
 input_shape: [64, 64, 1]
-optimizer: "adam"
-learning_rate: 0.001
-loss_function: "binary_crossentropy"
-batch_size: 32
-epochs: 10
+preprocessing: "Industrial Noise + Vignette + Shift"
+optimizer: "Adam"
 callbacks:
-  - "EarlyStopping (patience=5)"
+  - "EarlyStopping"
   - "ReduceLROnPlateau"
-augmentation:
-  - "Gaussian Noise"
-  - "Lighting Variation"
+  - "CSVLogger"

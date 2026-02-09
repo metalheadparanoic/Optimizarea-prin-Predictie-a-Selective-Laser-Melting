@@ -1,31 +1,39 @@
 import os
 import json
-import csv
 import numpy as np
 import tensorflow as tf
+import matplotlib.pyplot as plt
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, classification_report
+import sys
 
 # --- CONFIGURARE ---
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"))
 MODELS_DIR = os.path.join(PROJECT_ROOT, "models")
 DATA_DIR = os.path.join(PROJECT_ROOT, "data", "test")
 RESULTS_DIR = os.path.join(PROJECT_ROOT, "results")
+DOCS_DIR = os.path.join(PROJECT_ROOT, "docs")
 
-# Asiguram crearea folderului results
+# Asiguram folderele de iesire
 os.makedirs(RESULTS_DIR, exist_ok=True)
+os.makedirs(DOCS_DIR, exist_ok=True)
 
 def main():
-    print("📊 Începere Evaluare Finală & Generare Rapoarte...")
+    print(" Incepere Evaluare Finala Completa...")
 
-    # 1. Incarcare Model
-    model_path = os.path.join(MODELS_DIR, "trained_model.h5")
+    # 1. Incarcare Model (Prioritate: Optimizat -> Antrenat)
+    model_path = os.path.join(MODELS_DIR, "optimized_model.h5")
     if not os.path.exists(model_path):
-        print("❌ Eroare: Nu găsesc modelul antrenat!")
-        return
+        model_path = os.path.join(MODELS_DIR, "trained_model.h5")
     
-    model = tf.keras.models.load_model(model_path)
-    print("✅ Model încărcat.")
+    if not os.path.exists(model_path):
+        print(" Eroare: Nu gasesc niciun model (.h5)!")
+        return
 
-    # 2. Evaluare pe Setul de Test (REAL)
+    print(f" Incarcare model din: {model_path}")
+    model = tf.keras.models.load_model(model_path)
+
+    # 2. Incarcare Date de Test
+    # IMPORTANT: shuffle=False pentru Matricea de Confuzie
     test_ds = tf.keras.utils.image_dataset_from_directory(
         DATA_DIR,
         image_size=(64, 64),
@@ -34,66 +42,78 @@ def main():
         label_mode='binary',
         shuffle=False
     )
-    
+
+    # 3. Evaluare Generala (Loss/Accuracy)
+    print(" Calculare metrici globale...")
     results = model.evaluate(test_ds, verbose=1)
     test_loss, test_acc = results[0], results[1]
-    
-    print(f"📈 Rezultate Test: Loss={test_loss:.4f}, Accuracy={test_acc:.4f}")
+    print(f" Rezultate Globale: Loss={test_loss:.4f}, Accuracy={test_acc:.4f}")
 
-    # 3. Generare 'test_metrics.json'
+    # Salvare JSON
     metrics_data = {
         "test_loss": test_loss,
         "test_accuracy": test_acc,
-        "model_name": "SLM_CNN_v1",
+        "model_name": "SLM_CNN_Optimized",
         "status": "Production Ready"
     }
-    
-    json_path = os.path.join(RESULTS_DIR, "test_metrics.json")
-    with open(json_path, 'w') as f:
+    with open(os.path.join(RESULTS_DIR, "test_metrics.json"), 'w') as f:
         json.dump(metrics_data, f, indent=4)
-    print(f"💾 Salvat: {json_path}")
 
-    # 4. Generare 'hyperparameters.yaml'
+    # 4. Generare MATRICE DE CONFUZIE (Partea Vizuala)
+    print(" Generare Matrice de Confuzie...")
+    
+    y_true = []
+    y_pred_probs = []
+
+    for images, labels in test_ds:
+        y_true.extend(labels.numpy().flatten())
+        preds = model.predict(images, verbose=0)
+        y_pred_probs.extend(preds.flatten())
+
+    y_true = np.array(y_true)
+    y_pred = (np.array(y_pred_probs) > 0.5).astype(int)
+    
+    # Numele claselor (in functie de ordinea alfabetica a folderelor)
+    class_names = test_ds.class_names # ['defect', 'ok']
+    
+    # Desenare Matrice
+    cm = confusion_matrix(y_true, y_pred)
+    plt.figure(figsize=(8, 6))
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=class_names)
+    disp.plot(cmap=plt.cm.Blues, values_format='d')
+    plt.title(f"Confusion Matrix (Acc: {test_acc:.2%})")
+    
+    # Salvare PNG in DOCS
+    save_cm_path = os.path.join(DOCS_DIR, "confusion_matrix.png")
+    plt.savefig(save_cm_path)
+    print(f" Matrice salvata in: {save_cm_path}")
+
+    # 5. Raport Detaliat (Precision/Recall)
+    report = classification_report(y_true, y_pred, target_names=class_names)
+    print("\n" + "="*40)
+    print(" RAPORT DETALIAT PE CLASE")
+    print("="*40)
+    print(report)
+
+    # Salvare raport text
+    with open(os.path.join(RESULTS_DIR, "final_classification_report.txt"), "w") as f:
+        f.write(report)
+
+    # 6. Generare Hyperparameters YAML 
     yaml_content = """
-model_type: "CNN"
+model_type: "CNN Custom Architecture"
 input_shape: [64, 64, 1]
-optimizer: "adam"
-learning_rate: 0.001
-loss_function: "binary_crossentropy"
-batch_size: 32
-epochs: 10
+preprocessing: "Industrial Noise + Vignette + Shift"
+optimizer: "Adam"
 callbacks:
-  - "EarlyStopping (patience=5)"
+  - "EarlyStopping"
   - "ReduceLROnPlateau"
-augmentation:
-  - "Gaussian Noise"
-  - "Lighting Variation"
+  - "CSVLogger"
     """
-    yaml_path = os.path.join(RESULTS_DIR, "hyperparameters.yaml")
-    with open(yaml_path, 'w') as f:
+    with open(os.path.join(RESULTS_DIR, "hyperparameters.yaml"), 'w') as f:
         f.write(yaml_content.strip())
-    print(f"💾 Salvat: {yaml_path}")
 
-    # 5. Generare 'training_history.csv' (Simulat pe baza graficului tau, ca sa nu re-antrenezi)
-    # Deoarece nu am salvat CSV-ul la antrenare, il reconstruim pentru a satisface cerinta structurii.
-    csv_path = os.path.join(RESULTS_DIR, "training_history.csv")
-    with open(csv_path, 'w', newline='') as f:
-        writer = csv.writer(f)
-        writer.writerow(['epoch', 'accuracy', 'loss', 'val_accuracy', 'val_loss'])
-        # Date simulate care se potrivesc cu graficul tau (convergenta rapida)
-        writer.writerow([0, 0.65, 0.60, 0.70, 0.55])
-        writer.writerow([1, 0.75, 0.50, 0.78, 0.45])
-        writer.writerow([2, 0.82, 0.40, 0.80, 0.40])
-        writer.writerow([3, 0.85, 0.35, 0.83, 0.35])
-        writer.writerow([4, 0.88, 0.30, 0.85, 0.32])
-        writer.writerow([5, 0.90, 0.28, 0.86, 0.30])
-        writer.writerow([6, 0.91, 0.25, 0.87, 0.29])
-        writer.writerow([7, 0.92, 0.22, 0.88, 0.28])
-        writer.writerow([8, 0.93, 0.20, 0.88, 0.27])
-        writer.writerow([9, 0.94, 0.18, 0.89, 0.25]) # Valori finale similare cu ce ai obtinut
-        
-    print(f"💾 Salvat: {csv_path}")
-    print("✅ Generare artefacte folder 'results' completa!")
+    print(" Evaluare completa! Verifica folderul 'docs' si 'results'.")
 
 if __name__ == "__main__":
     main()

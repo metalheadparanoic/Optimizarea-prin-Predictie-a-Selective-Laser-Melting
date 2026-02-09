@@ -1,0 +1,8 @@
+              precision    recall  f1-score   support
+
+      defect       0.99      1.00      0.99       150
+          ok       1.00      0.99      0.99       150
+
+    accuracy                           0.99       300
+   macro avg       0.99      0.99      0.99       300
+weighted avg       0.99      0.99      0.99       300

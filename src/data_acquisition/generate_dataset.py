@@ -1,97 +1,123 @@
+import os
 import cv2
 import numpy as np
-import os
-import random
 import shutil
+import random
 from sklearn.model_selection import train_test_split
 
-# --- CONFIGURARE CĂI (Relative la locul unde rulăm scriptul) ---
-# Scriptul e în src/data_acquisition, deci urcăm 2 nivele (../../) până la PROIECT
-BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data"))
-RAW_DIR = os.path.join(BASE_DIR, "raw")
-TRAIN_DIR = os.path.join(BASE_DIR, "train")
-VAL_DIR = os.path.join(BASE_DIR, "validation")
-TEST_DIR = os.path.join(BASE_DIR, "test")
+# --- CONFIGURARE CĂI ---
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"))
+DATA_DIR = os.path.join(PROJECT_ROOT, "data")
+RAW_DIR = os.path.join(DATA_DIR, "raw")
+PROCESSED_DIR = os.path.join(DATA_DIR, "processed")
+TRAIN_DIR = os.path.join(DATA_DIR, "train")
+VAL_DIR = os.path.join(DATA_DIR, "validation")
+TEST_DIR = os.path.join(DATA_DIR, "test")
 
-IMG_SIZE = 64
-SAMPLES_PER_CLASS = 1000  # 1000 OK + 1000 Defecte = 2000 total
+def apply_industrial_camera_effect(img):
+    """
+    Simuleaza imperfectiunile camerei:
+    1. Deplasare aleatoare (Shift) - ca piesa sa nu fie perfect centrata.
+    2. Zgomot de senzor (Gaussian Noise).
+    3. Vinietare (Colturi intunecate).
+    """
+    rows, cols = img.shape
+    
+    # 1. Random Shift (+/- 5 pixeli)
+    dx = random.randint(-5, 5)
+    dy = random.randint(-5, 5)
+    M = np.float32([[1, 0, dx], [0, 1, dy]])
+    # Umplem marginea ramasa goala cu culoarea medie a imaginii (gri)
+    img = cv2.warpAffine(img, M, (cols, rows), borderValue=int(np.mean(img)))
 
-def create_dirs():
-    """Creează structura de foldere dacă nu există."""
-    print(f"Directoarele vor fi create în: {BASE_DIR}")
-    for d in [os.path.join(RAW_DIR, "ok"), os.path.join(RAW_DIR, "defect")]:
-        os.makedirs(d, exist_ok=True)
+    # 2. Zgomot (Fara pureci albi/negri)
+    img_float = img.astype(np.float32)
+    noise = np.random.normal(0, 18, img.shape).astype(np.float32)
+    img_noisy = cv2.add(img_float, noise)
+    img_noisy = np.clip(img_noisy, 0, 255).astype(np.uint8)
+    
+    # 3. Vinietare
+    kernel_x = cv2.getGaussianKernel(cols, int(cols * 0.8)) 
+    kernel_y = cv2.getGaussianKernel(rows, int(rows * 0.8))
+    kernel = kernel_y * kernel_x.T
+    mask = kernel / kernel.max()
+    
+    return (img_noisy * mask).astype(np.uint8)
+
+def create_dirs(path):
+    """Sterge si recreeaza structura de foldere."""
+    if os.path.exists(path):
+        try: shutil.rmtree(path)
+        except Exception as e: print(f"⚠️ Atentie: {e}")
+    os.makedirs(path, exist_ok=True)
+    for cls in ["ok", "defect"]:
+        os.makedirs(os.path.join(path, cls), exist_ok=True)
+
+def process_and_split():
+    print(" START: Procesare & Impartire Date...")
+    print("-" * 50)
+    
+    # --- PASUL 1: GENERARE PROCESSED ---
+    create_dirs(PROCESSED_DIR)
     
     classes = ["ok", "defect"]
-    for split_dir in [TRAIN_DIR, VAL_DIR, TEST_DIR]:
-        for cls in classes:
-            os.makedirs(os.path.join(split_dir, cls), exist_ok=True)
+    total_processed = 0
 
-def generate_melt_pool(is_defect=False):
-    """Desenează un melt-pool simulat."""
-    img = np.zeros((IMG_SIZE, IMG_SIZE), dtype=np.uint8)
-    center = (IMG_SIZE // 2, IMG_SIZE // 2)
-    
-    if not is_defect:
-        # --- OK ---
-        radius = random.randint(10, 14)
-        axes = (radius, radius + random.randint(-1, 1))
-        angle = random.randint(0, 360)
-        cv2.ellipse(img, center, axes, angle, 0, 360, 255, -1)
-        img = cv2.GaussianBlur(img, (9, 9), 0)
-    else:
-        # --- DEFECT ---
-        axis_x = random.randint(8, 18)
-        axis_y = random.randint(5, 12)
-        angle = random.randint(0, 180)
-        cv2.ellipse(img, center, (axis_x, axis_y), angle, 0, 360, 255, -1)
-        
-        # Stropi (Spatter)
-        num_spatter = random.randint(3, 8)
-        for _ in range(num_spatter):
-            sx = random.randint(10, 54)
-            sy = random.randint(10, 54)
-            if np.linalg.norm(np.array([sx, sy]) - np.array(center)) > 10:
-                cv2.circle(img, (sx, sy), random.randint(1, 2), 200, -1)
-        img = cv2.GaussianBlur(img, (5, 5), 0)
-
-    # Zgomot
-    noise = np.random.normal(0, 15, img.shape).astype(np.uint8)
-    img = cv2.add(img, noise)
-    return img
-
-def split_and_copy():
-    """Împarte datele raw în train/val/test."""
-    classes = ["ok", "defect"]
+    print(" Aplicare efecte industriale...")
     for cls in classes:
         src_path = os.path.join(RAW_DIR, cls)
-        # Listăm doar fișierele .png
-        images = [f for f in os.listdir(src_path) if f.endswith('.png')]
-        random.shuffle(images)
+        dst_path = os.path.join(PROCESSED_DIR, cls)
         
-        # Împărțire: 70% Train, 15% Val, 15% Test
-        train_imgs, test_val_imgs = train_test_split(images, test_size=0.3, random_state=42)
-        val_imgs, test_imgs = train_test_split(test_val_imgs, test_size=0.5, random_state=42)
+        count_cls = 0
+        if not os.path.exists(src_path):
+            print(f" EROARE: Nu gasesc folderul {src_path}")
+            continue
+
+        for filename in os.listdir(src_path):
+            if filename.endswith(".png"):
+                img = cv2.imread(os.path.join(src_path, filename), cv2.IMREAD_GRAYSCALE)
+                if img is None: continue
+                
+                img_processed = apply_industrial_camera_effect(img)
+                cv2.imwrite(os.path.join(dst_path, filename), img_processed)
+                count_cls += 1
         
-        print(f"Clasa '{cls}': {len(train_imgs)} Train, {len(val_imgs)} Val, {len(test_imgs)} Test")
+        print(f"   Clasa '{cls.upper()}': {count_cls} imagini procesate.")
+        total_processed += count_cls
+
+    # --- PASUL 2: IMPARTIRE TRAIN/VAL/TEST ---
+    print("-" * 50)
+    print(" Impartire Dataset (Train / Val / Test)...")
+    
+    create_dirs(TRAIN_DIR)
+    create_dirs(VAL_DIR)
+    create_dirs(TEST_DIR)
+
+    for cls in classes:
+        src_path = os.path.join(PROCESSED_DIR, cls)
+        all_images = [f for f in os.listdir(src_path) if f.endswith(".png")]
         
-        # Copiere
+        # Amestecam imaginile inainte de split
+        random.shuffle(all_images)
+        
+        # Split: 70% Train, 15% Val, 15% Test
+        train_imgs, test_val = train_test_split(all_images, test_size=0.3, random_state=42)
+        val_imgs, test_imgs = train_test_split(test_val, test_size=0.5, random_state=42)
+        
+        # Copiere efectiva
         for f in train_imgs: shutil.copy2(os.path.join(src_path, f), os.path.join(TRAIN_DIR, cls, f))
-        for f in val_imgs: shutil.copy2(os.path.join(src_path, f), os.path.join(VAL_DIR, cls, f))
-        for f in test_imgs: shutil.copy2(os.path.join(src_path, f), os.path.join(TEST_DIR, cls, f))
+        for f in val_imgs:   shutil.copy2(os.path.join(src_path, f), os.path.join(VAL_DIR, cls, f))
+        for f in test_imgs:  shutil.copy2(os.path.join(src_path, f), os.path.join(TEST_DIR, cls, f))
+        
+        # --- AFISARE STATISTICI ---
+        print(f"\n Statistici Clasa {cls.upper()}:")
+        print(f"    Train: {len(train_imgs):<5} (Invatare)")
+        print(f"    Val:   {len(val_imgs):<5} (Verificare in timpul invatarii)")
+        print(f"    Test:  {len(test_imgs):<5} (Evaluare finala)")
+        print(f"    Total: {len(all_images)}")
+
+    print("-" * 50)
+    print(" Procesare completa! Datele sunt gata de antrenare.")
 
 if __name__ == "__main__":
-    print("Start Generare Date SLM...")
-    create_dirs()
-    
-    # 1. Generare Raw
-    print("Generare imagini brute (RAW)...")
-    for i in range(SAMPLES_PER_CLASS):
-        cv2.imwrite(os.path.join(RAW_DIR, "ok", f"ok_{i:04d}.png"), generate_melt_pool(False))
-        cv2.imwrite(os.path.join(RAW_DIR, "defect", f"defect_{i:04d}.png"), generate_melt_pool(True))
-        
-    # 2. Împărțire
-    print("scissors  Împărțire dataset (Train/Val/Test)...")
-    split_and_copy()
-    
-    print("\nGATA! Datele au fost generate local în folderul 'data'.")
+    process_and_split()
