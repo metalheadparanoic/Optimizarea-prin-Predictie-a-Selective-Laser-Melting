@@ -1,0 +1,25 @@
+# Python cache (obligatoriu de ignorat, sunt fișiere temporare)
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Medii virtuale (dacă ai folosit venv)
+venv/
+env/
+.env
+.venv/
+
+# Configurații IDE (VS Code, PyCharm - nu e nevoie să le vadă proful)
+.vscode/
+.idea/
+
+# Fișiere de sistem inutile
+.DS_Store
+Thumbs.db
+
+# Log-uri temporare (dar păstrăm production_log.csv dacă e cerut ca livrabil)
+*.log
+
+# Dacă vrei să ignori folderul temporar de upload din server
+temp_upload.png

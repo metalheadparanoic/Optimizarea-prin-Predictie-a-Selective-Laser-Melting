@@ -1,4 +1,4 @@
-# 📘 README – Etapa 5: Configurarea și Antrenarea Modelului RN
+# README – Etapa 5: Configurarea și Antrenarea Modelului RN
 
 **Disciplina:** Rețele Neuronale  
 **Instituție:** POLITEHNICA București – FIIR  

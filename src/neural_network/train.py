@@ -1,107 +1,137 @@
 import os
-import tensorflow as tf
-from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau, CSVLogger
-import matplotlib.pyplot as plt
+import argparse
 import sys
+import tensorflow as tf
+from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping, ReduceLROnPlateau
+import matplotlib.pyplot as plt
 
-# Setup cai importuri
+# Adaugam calea radacina pentru a putea importa modulele din src
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
-from src.neural_network.model import build_cnn_model
 
-# Configurare Cai
+# Importam arhitectura modelului
+try:
+    from src.neural_network.model import create_model
+except ImportError:
+    print("[EROARE] Nu s-a putut importa 'create_model' din src.neural_network.model")
+    sys.exit(1)
+
+# --- CONFIGURARE CAI ---
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"))
 DATA_DIR = os.path.join(PROJECT_ROOT, "data")
-TRAIN_DIR = os.path.join(DATA_DIR, "train")
-VAL_DIR = os.path.join(DATA_DIR, "validation")
-DOCS_DIR = os.path.join(PROJECT_ROOT, "docs")
 MODELS_DIR = os.path.join(PROJECT_ROOT, "models")
 RESULTS_DIR = os.path.join(PROJECT_ROOT, "results")
 
-# Asiguram existenta folderelor
+# Creare foldere necesare
 os.makedirs(MODELS_DIR, exist_ok=True)
-os.makedirs(DOCS_DIR, exist_ok=True)
 os.makedirs(RESULTS_DIR, exist_ok=True)
 
-IMG_SIZE = (64, 64)
-BATCH_SIZE = 32
-EPOCHS = 30 # Punem mai multe, oricum EarlyStopping il opreste cand e gata
+def train_model(lr, batch_size, epochs, dropout_rate, exp_name):
+    print(f"\n[INFO] Start Antrenament: {exp_name}")
+    print(f"       Parametri: LR={lr}, BS={batch_size}, Epochs={epochs}, Dropout={dropout_rate}")
 
-def plot_history(history):
-    acc = history.history['accuracy']
-    val_acc = history.history['val_accuracy']
-    loss = history.history['loss']
-    val_loss = history.history['val_loss']
-    epochs_range = range(len(acc))
+    # 1. Incarcare Date
+    train_dir = os.path.join(DATA_DIR, "train")
+    val_dir = os.path.join(DATA_DIR, "validation")
 
-    plt.figure(figsize=(12, 5))
-    
-    # Plot Loss
-    plt.subplot(1, 2, 1)
-    plt.plot(epochs_range, loss, label='Training Loss')
-    plt.plot(epochs_range, val_loss, label='Validation Loss')
-    plt.title('Loss Curve')
-    plt.legend()
-    plt.grid(True)
+    if not os.path.exists(train_dir) or not os.path.exists(val_dir):
+        print(f"[EROARE] Folderele de date nu exista: {train_dir}")
+        return
 
-    # Plot Accuracy
-    plt.subplot(1, 2, 2)
-    plt.plot(epochs_range, acc, label='Training Accuracy')
-    plt.plot(epochs_range, val_acc, label='Validation Accuracy')
-    plt.title('Accuracy Curve')
-    plt.legend()
-    plt.grid(True)
-
-    plt.tight_layout()
-    # Salvam graficul pentru documentatie
-    plt.savefig(os.path.join(DOCS_DIR, "loss_curve.png"))
-    # Salvam si in results (pentru Etapa 6)
-    plt.savefig(os.path.join(RESULTS_DIR, "learning_curves_final.png"))
-    print("Grafice salvate.")
-    plt.close()
-
-def main():
-    print("Start Antrenare Model (Etapa 5/6)...")
-
-    # Incarcare Date
     train_ds = tf.keras.utils.image_dataset_from_directory(
-        TRAIN_DIR, image_size=IMG_SIZE, batch_size=BATCH_SIZE,
-        color_mode='grayscale', label_mode='binary', shuffle=True
+        train_dir,
+        image_size=(64, 64),
+        batch_size=batch_size,
+        color_mode='grayscale',
+        label_mode='binary',
+        shuffle=True
     )
+
     val_ds = tf.keras.utils.image_dataset_from_directory(
-        VAL_DIR, image_size=IMG_SIZE, batch_size=BATCH_SIZE,
-        color_mode='grayscale', label_mode='binary'
+        val_dir,
+        image_size=(64, 64),
+        batch_size=batch_size,
+        color_mode='grayscale',
+        label_mode='binary',
+        shuffle=False
     )
 
-    # Optimizare viteza
-    train_ds = train_ds.cache().prefetch(buffer_size=tf.data.AUTOTUNE)
-    val_ds = val_ds.cache().prefetch(buffer_size=tf.data.AUTOTUNE)
+    # Optimizare performanta dataset
+    AUTOTUNE = tf.data.AUTOTUNE
+    train_ds = train_ds.cache().prefetch(buffer_size=AUTOTUNE)
+    val_ds = val_ds.cache().prefetch(buffer_size=AUTOTUNE)
 
-    # Construire Model (cel nou din model.py)
-    model = build_cnn_model(input_shape=(64, 64, 1))
-
-    # Callbacks
-    callbacks = [
-        # Opreste daca nu invata timp de 6 epoci
-        EarlyStopping(monitor='val_loss', patience=6, restore_best_weights=True, verbose=1),
-        # Scade rata de invatare daca se blocheaza
-        ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=3, verbose=1),
-        # Salveaza istoricul intr-un CSV (Important pentru Results!)
-        CSVLogger(os.path.join(RESULTS_DIR, "training_history.csv"))
-    ]
-
-    # Antrenare
-    history = model.fit(
-        train_ds, validation_data=val_ds,
-        epochs=EPOCHS, callbacks=callbacks
-    )
-
-    # Salvare Model
-    # Salvam si ca 'trained' (pentru compatibilitate) si ca 'optimized' (pentru Etapa 6)
-    model.save(os.path.join(MODELS_DIR, "trained_model.h5"))
-    model.save(os.path.join(MODELS_DIR, "optimized_model.h5"))
+    # 2. Creare Model
+    # Nota: Daca functia create_model din model.py nu accepta parametri,
+    # dropout-ul va fi cel default din arhitectura.
+    try:
+        # Incercam sa pasam dropout daca functia il accepta
+        model = create_model(dropout_rate)
+    except TypeError:
+        # Daca nu accepta argumente, il cream standard
+        model = create_model()
     
-    print("Model salvat cu succes.")
-    plot_history(history)
+    # Compilare cu Learning Rate specificat
+    optimizer = tf.keras.optimizers.Adam(learning_rate=lr)
+    
+    model.compile(
+        optimizer=optimizer,
+        loss='binary_crossentropy',
+        metrics=['accuracy']
+    )
+
+    # 3. Callbacks
+    model_name = f"trained_model_{exp_name}.h5" if exp_name != "default" else "trained_model.h5"
+    checkpoint_path = os.path.join(MODELS_DIR, model_name)
+    
+    checkpoint = ModelCheckpoint(
+        checkpoint_path,
+        monitor='val_accuracy',
+        save_best_only=True,
+        mode='max',
+        verbose=1
+    )
+
+    early_stopping = EarlyStopping(
+        monitor='val_loss',
+        patience=6,
+        restore_best_weights=True
+    )
+    
+    reduce_lr = ReduceLROnPlateau(
+        monitor='val_loss',
+        factor=0.5,
+        patience=3,
+        min_lr=1e-6
+    )
+
+    # 4. Antrenare
+    history = model.fit(
+        train_ds,
+        validation_data=val_ds,
+        epochs=epochs,
+        callbacks=[checkpoint, early_stopping, reduce_lr],
+        verbose=1
+    )
+
+    print(f"[OK] Antrenament finalizat. Model salvat: {checkpoint_path}")
+    return history
 
 if __name__ == "__main__":
-    main()
+    # Configurare Argument Parser pentru linia de comanda
+    parser = argparse.ArgumentParser(description="Script antrenare SLM Neural Network")
+    
+    parser.add_argument("--lr", type=float, default=0.001, help="Learning Rate")
+    parser.add_argument("--batch", type=int, default=32, help="Batch Size")
+    parser.add_argument("--epochs", type=int, default=25, help="Numar epoci")
+    parser.add_argument("--dropout", type=float, default=0.5, help="Rata Dropout")
+    parser.add_argument("--name", type=str, default="default", help="Nume experiment (sufix fisier)")
+
+    args = parser.parse_args()
+
+    train_model(
+        lr=args.lr,
+        batch_size=args.batch,
+        epochs=args.epochs,
+        dropout_rate=args.dropout,
+        exp_name=args.name
+    )
