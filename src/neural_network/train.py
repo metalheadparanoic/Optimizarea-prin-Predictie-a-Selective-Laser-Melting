@@ -3,23 +3,21 @@ import argparse
 import sys
 import tensorflow as tf
 from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping, ReduceLROnPlateau
-import matplotlib.pyplot as plt
 
-# Adaugam calea radacina pentru a putea importa modulele din src
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
+# --- REPARARE IMPORTURI ---
+# Adaugam folderul radacina (PROIECT) in sys.path
+# Astfel Python stie ca "src" este un pachet valid
+current_dir = os.path.dirname(os.path.abspath(__file__)) # src/neural_network
+project_root = os.path.abspath(os.path.join(current_dir, "../../")) # PROIECT
+sys.path.append(project_root)
 
-# Importam arhitectura modelului
-try:
-    from src.neural_network.model import create_model
-except ImportError:
-    print("[EROARE] Nu s-a putut importa 'create_model' din src.neural_network.model")
-    sys.exit(1)
+# Acum importam direct (fara try-except, ca sa vedem eroarea reala daca exista)
+from src.neural_network.model import create_model
 
 # --- CONFIGURARE CAI ---
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"))
-DATA_DIR = os.path.join(PROJECT_ROOT, "data")
-MODELS_DIR = os.path.join(PROJECT_ROOT, "models")
-RESULTS_DIR = os.path.join(PROJECT_ROOT, "results")
+DATA_DIR = os.path.join(project_root, "data")
+MODELS_DIR = os.path.join(project_root, "models")
+RESULTS_DIR = os.path.join(project_root, "results")
 
 # Creare foldere necesare
 os.makedirs(MODELS_DIR, exist_ok=True)
@@ -35,6 +33,7 @@ def train_model(lr, batch_size, epochs, dropout_rate, exp_name):
 
     if not os.path.exists(train_dir) or not os.path.exists(val_dir):
         print(f"[EROARE] Folderele de date nu exista: {train_dir}")
+        print("       Rulati intai generate_dataset.py si processed_data.py!")
         return
 
     train_ds = tf.keras.utils.image_dataset_from_directory(
@@ -61,14 +60,8 @@ def train_model(lr, batch_size, epochs, dropout_rate, exp_name):
     val_ds = val_ds.cache().prefetch(buffer_size=AUTOTUNE)
 
     # 2. Creare Model
-    # Nota: Daca functia create_model din model.py nu accepta parametri,
-    # dropout-ul va fi cel default din arhitectura.
-    try:
-        # Incercam sa pasam dropout daca functia il accepta
-        model = create_model(dropout_rate)
-    except TypeError:
-        # Daca nu accepta argumente, il cream standard
-        model = create_model()
+    # Acum apelam functia importata din model.py
+    model = create_model(dropout_rate)
     
     # Compilare cu Learning Rate specificat
     optimizer = tf.keras.optimizers.Adam(learning_rate=lr)
@@ -117,7 +110,6 @@ def train_model(lr, batch_size, epochs, dropout_rate, exp_name):
     return history
 
 if __name__ == "__main__":
-    # Configurare Argument Parser pentru linia de comanda
     parser = argparse.ArgumentParser(description="Script antrenare SLM Neural Network")
     
     parser.add_argument("--lr", type=float, default=0.001, help="Learning Rate")

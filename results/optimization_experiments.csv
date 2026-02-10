@@ -1,7 +1,7 @@
-Exp_ID,Modificare,Accuracy,F1_Score,Timp_Antrenare,Observatii
-Baseline,Config Etapa 5,0.9233,0.9288,5.74s,Referinta
-Exp 1,LR 0.001 -> 0.0001,0.9933,0.9933,5.67s,Convergenta mai lenta
-Exp 2,Batch 32 -> 64,0.9833,0.9836,5.59s,"Viteza mare, stabilitate redusa"
-Exp 3,+1 Hidden Layer (128),0.99,0.9899,5.85s,Capacitate crescuta
-Exp 4,Dropout 0.5 -> 0.7,0.9833,0.9835,6.15s,Regularizare agresiva
-Exp 5,Extra Augmentare (Gaussian),0.9967,0.9967,6.1s,Robustete (BEST)
+Exp_ID,Accuracy,F1_Score,Timp_Antrenare,Observatii
+Baseline,1.0,1.0,19.03s,Referinta
+Exp_1,0.66,0.4848,18.29s,Convergenta fina
+Exp_2,0.9867,0.9865,15.58s,Viteza mare
+Exp_3,0.9933,0.9933,21.08s,Capacitate crescuta
+Exp_4,0.96,0.9583,27.05s,Regularizare agresiva
+Exp_5,1.0,1.0,17.95s,Augmentare robusta

@@ -1,0 +1,10 @@
+{
+    "errors": [
+        {
+            "index": 254,
+            "true_label": "ok",
+            "pred_prob": 0.37439578771591187,
+            "pred_label": "defect"
+        }
+    ]
+}

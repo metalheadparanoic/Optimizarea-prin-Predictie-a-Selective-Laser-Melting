@@ -451,6 +451,7 @@ PROIECT/
     │   ├── model.py                    # Arhitectură CNN
     │   ├── train.py                    # Script antrenament
     │   ├── evaluate.py                 # Script evaluare & TFLite (actualizat)
+    │   ├── visualize.py                # NOU - Generare grafice documentație
     │   ├── optimize.py                 # Script experimente optimizare
     │   ├── predict.py                  # Script inferență CLI
     │   └── save_untrained.py
@@ -461,13 +462,14 @@ PROIECT/
 
 **Diferențe față de Etapa 5:**
 - Adăugat `etapa6_optimizare_concluzii.md` (acest fișier)
-- Adăugat `docs/confusion_matrix_optimized.png` - OBLIGATORIU (Model Final)
+- Adăugat `docs/confusion_matrix_optimized.png` - (Model Final)
 - Adăugat `docs/results/` cu vizualizări finale (`metrics_evolution.png`, `learning_curves_final.png`)
 - Adăugat `docs/optimization/` cu grafice comparative (`accuracy_comparison.png`)
-- Adăugat `docs/screenshots/inference_optimized.png` - OBLIGATORIU (Screenshot UI cu scor > 99%)
-- Adăugat `models/optimized_model.h5` - OBLIGATORIU (Modelul cu 99.67% acuratețe)
+- Adăugat `docs/screenshots/inference_optimized.png` - Screenshot UI cu scor > 99%
+- Adăugat `models/optimized_model.h5` - Modelul cu 99.67% acuratețe
 - Adăugat `models/final_model.tflite` - Model optimizat pentru Edge Deployment
-- Adăugat `results/optimization_experiments.csv` - OBLIGATORIU (Rezultate Grid Search)
+- Adăugat `results/optimization_experiments.csv` - (Rezultate Grid Search)
+- Adăugat `src/neural_network/visualize.py` - script generare grafice finale
 - Adăugat `results/final_metrics.json` - metrici finale
 - Adăugat `src/neural_network/optimize.py` - script optimizare
 - Actualizat `src/neural_network/evaluate.py` - include generare matrice confuzie și TFLite
@@ -479,9 +481,17 @@ PROIECT/
 
 Aveți la dispoziție două metode pentru a rula experimentele de optimizare a rețelei neuronale:
 
-#### Opțiunea A - Manual (linie de comandă)
+#### Opțiunea A - Automat (Recomandat - Grid Search)
+Aceasta este metoda principală pentru Etapa 6. Scriptul rulează secvențial 4 experimente cu parametri diferiți, compară rezultatele, generează raportul CSV și salvează automat cel mai bun model sub numele `optimized_model.h5`.
+
+```bash
+# Rulează tot pipeline-ul de optimizare
+python src/neural_network/optimize.py
+
 Puteți rula individual fiecare experiment folosind scriptul `train.py` cu argumente specifice. Aceasta permite testarea rapidă a unor ipoteze.
 
+```
+#### Opțiunea B - Manual (linie de comandă)
 ```bash
 # Experiment 1: Baseline (Configuratia standard: LR=0.001, Batch=32)
 python src/neural_network/train.py --lr 0.001 --batch 32 --epochs 25 --name exp1
@@ -495,7 +505,6 @@ python src/neural_network/train.py --lr 0.001 --batch 64 --epochs 25 --name exp3
 # Experiment 4: Regularizare (Dropout explicit)
 python src/neural_network/train.py --lr 0.001 --batch 32 --dropout 0.5 --epochs 25 --name exp4
 ```
-
 ### 2. Evaluare și comparare
 
 Pentru a genera raportul final de clasificare, matricea de confuzie și analiza detaliată a erorilor, rulați comanda de mai jos. Aceasta va selecta automat modelul optimizat dacă este prezent.
@@ -524,3 +533,69 @@ python src/app/main.py
 # Model incarcat cu succes.
 # Pornire Server Flask...
 # Server porneste pe http://127.0.0.1:5000
+```
+
+### 4. Generare vizualizări finale
+
+Rulați scriptul de vizualizare (care integrează logica din `generate_plots.py` și `generate_final_plots.py`) pentru a popula folderele de documentație.
+
+```bash
+python src/neural_network/visualize.py
+
+# Generează:
+# - docs/results/metrics_evolution.png
+# - docs/results/learning_curves_final.png
+# - docs/optimization/accuracy_comparison.png
+# - docs/optimization/f1_comparison.png
+```
+
+---
+
+## Checklist Final – Bifați Totul Înainte de Predare
+
+### Prerequisite Etapa 5 (verificare)
+- [x] Model antrenat există în `models/trained_model.h5`
+- [x] Metrici baseline raportate (Accuracy ≥65%, F1 ≥0.60)
+- [x] UI funcțional cu model antrenat
+- [x] State Machine implementat
+
+### Optimizare și Experimentare
+- [x] Minimum 4 experimente documentate în tabel
+- [x] Justificare alegere configurație finală
+- [x] Model optimizat salvat în `models/optimized_model.h5`
+- [x] Metrici finale: **Accuracy ≥70%**, **F1 ≥0.65**
+- [x] `results/optimization_experiments.csv` cu toate experimentele
+- [x] `results/final_metrics.json` cu metrici model optimizat
+
+### Analiză Performanță
+- [x] Confusion matrix generată în `docs/confusion_matrix_optimized.png`
+- [x] Analiză interpretare confusion matrix completată în README
+- [x] Minimum 5 exemple greșite analizate detaliat
+- [x] Implicații industriale documentate (cost FN vs FP)
+
+### Actualizare Aplicație Software
+- [x] Tabel modificări aplicație completat
+- [x] UI încarcă modelul OPTIMIZAT (nu cel din Etapa 5)
+- [x] Screenshot `docs/screenshots/inference_optimized.png`
+- [x] Pipeline end-to-end re-testat și funcțional
+- [x] (Dacă aplicabil) State Machine actualizat și documentat
+
+### Concluzii
+- [x] Secțiune evaluare performanță finală completată
+- [x] Limitări identificate și documentate
+- [x] Lecții învățate (minimum 5)
+- [x] Plan post-feedback scris
+
+### Verificări Tehnice
+- [x] `requirements.txt` actualizat
+- [x] Toate path-urile RELATIVE
+- [x] Cod nou comentat (minimum 15%)
+- [x] `git log` arată commit-uri incrementale
+- [x] Verificare anti-plagiat respectată
+
+### Verificare Actualizare Etape Anterioare (ITERATIVITATE)
+- [x] README Etapa 3 actualizat (dacă s-au modificat date/preprocesare)
+- [x] README Etapa 4 actualizat (dacă s-a modificat arhitectura/State Machine)
+- [x] README Etapa 5 actualizat (dacă s-au modificat parametri antrenare)
+- [x] `docs/state_machine.*` actualizat pentru a reflecta versiunea finală
+- [x] Toate fișierele de configurare sincronizate cu modelul optimizat

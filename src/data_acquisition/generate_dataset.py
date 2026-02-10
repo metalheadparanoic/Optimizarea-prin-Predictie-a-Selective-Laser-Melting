@@ -1,123 +1,99 @@
 import os
 import cv2
 import numpy as np
-import shutil
 import random
-from sklearn.model_selection import train_test_split
 
-# --- CONFIGURARE CĂI ---
+# --- CONFIGURARE ---
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"))
-DATA_DIR = os.path.join(PROJECT_ROOT, "data")
-RAW_DIR = os.path.join(DATA_DIR, "raw")
-PROCESSED_DIR = os.path.join(DATA_DIR, "processed")
-TRAIN_DIR = os.path.join(DATA_DIR, "train")
-VAL_DIR = os.path.join(DATA_DIR, "validation")
-TEST_DIR = os.path.join(DATA_DIR, "test")
+RAW_DATA_DIR = os.path.join(PROJECT_ROOT, "data", "raw")
+IMG_SIZE = 64
+SAMPLES_PER_CLASS = 1000  # Generam suficiente date pentru a obtine acuratete mare
 
-def apply_industrial_camera_effect(img):
-    """
-    Simuleaza imperfectiunile camerei:
-    1. Deplasare aleatoare (Shift) - ca piesa sa nu fie perfect centrata.
-    2. Zgomot de senzor (Gaussian Noise).
-    3. Vinietare (Colturi intunecate).
-    """
-    rows, cols = img.shape
+# Creare foldere
+os.makedirs(os.path.join(RAW_DATA_DIR, "ok"), exist_ok=True)
+os.makedirs(os.path.join(RAW_DATA_DIR, "defect"), exist_ok=True)
+
+def add_noise(image):
+    """Adauga zgomot Gaussian pentru a simula senzorul camerei."""
+    row, col = image.shape
+    mean = 0
+    var = 0.1
+    sigma = var ** 0.5
+    gauss = np.random.normal(mean, sigma, (row, col))
+    gauss = gauss.reshape(row, col)
+    noisy = image + gauss * 50
+    return np.clip(noisy, 0, 255).astype(np.uint8)
+
+def generate_stable_meltpool(index):
+    """Genereaza o imagine 'OK' - elipsa regulata, centrata."""
+    img = np.zeros((IMG_SIZE, IMG_SIZE), dtype=np.uint8)
     
-    # 1. Random Shift (+/- 5 pixeli)
-    dx = random.randint(-5, 5)
-    dy = random.randint(-5, 5)
-    M = np.float32([[1, 0, dx], [0, 1, dy]])
-    # Umplem marginea ramasa goala cu culoarea medie a imaginii (gri)
-    img = cv2.warpAffine(img, M, (cols, rows), borderValue=int(np.mean(img)))
-
-    # 2. Zgomot (Fara pureci albi/negri)
-    img_float = img.astype(np.float32)
-    noise = np.random.normal(0, 18, img.shape).astype(np.float32)
-    img_noisy = cv2.add(img_float, noise)
-    img_noisy = np.clip(img_noisy, 0, 255).astype(np.uint8)
+    # Parametri fizici simulati (stabilitate)
+    center = (IMG_SIZE // 2, IMG_SIZE // 2)
+    axes = (random.randint(10, 14), random.randint(8, 12)) # Variatie mica
+    angle = random.randint(0, 180)
     
-    # 3. Vinietare
-    kernel_x = cv2.getGaussianKernel(cols, int(cols * 0.8)) 
-    kernel_y = cv2.getGaussianKernel(rows, int(rows * 0.8))
-    kernel = kernel_y * kernel_x.T
-    mask = kernel / kernel.max()
+    # Desenare elipsa alba (Melt Pool)
+    cv2.ellipse(img, center, axes, angle, 0, 360, 255, -1)
     
-    return (img_noisy * mask).astype(np.uint8)
-
-def create_dirs(path):
-    """Sterge si recreeaza structura de foldere."""
-    if os.path.exists(path):
-        try: shutil.rmtree(path)
-        except Exception as e: print(f"⚠️ Atentie: {e}")
-    os.makedirs(path, exist_ok=True)
-    for cls in ["ok", "defect"]:
-        os.makedirs(os.path.join(path, cls), exist_ok=True)
-
-def process_and_split():
-    print(" START: Procesare & Impartire Date...")
-    print("-" * 50)
+    # Adaugare gradient termic (simulat prin blur)
+    img = cv2.GaussianBlur(img, (5, 5), 0)
+    img = add_noise(img)
     
-    # --- PASUL 1: GENERARE PROCESSED ---
-    create_dirs(PROCESSED_DIR)
+    # Salvare
+    path = os.path.join(RAW_DATA_DIR, "ok", f"ok_{index}.png")
+    cv2.imwrite(path, img)
+
+def generate_unstable_meltpool(index):
+    """Genereaza o imagine 'DEFECT' - forma neregulata, spatter, intreruperi."""
+    img = np.zeros((IMG_SIZE, IMG_SIZE), dtype=np.uint8)
     
-    classes = ["ok", "defect"]
-    total_processed = 0
-
-    print(" Aplicare efecte industriale...")
-    for cls in classes:
-        src_path = os.path.join(RAW_DIR, cls)
-        dst_path = os.path.join(PROCESSED_DIR, cls)
-        
-        count_cls = 0
-        if not os.path.exists(src_path):
-            print(f" EROARE: Nu gasesc folderul {src_path}")
-            continue
-
-        for filename in os.listdir(src_path):
-            if filename.endswith(".png"):
-                img = cv2.imread(os.path.join(src_path, filename), cv2.IMREAD_GRAYSCALE)
-                if img is None: continue
-                
-                img_processed = apply_industrial_camera_effect(img)
-                cv2.imwrite(os.path.join(dst_path, filename), img_processed)
-                count_cls += 1
-        
-        print(f"   Clasa '{cls.upper()}': {count_cls} imagini procesate.")
-        total_processed += count_cls
-
-    # --- PASUL 2: IMPARTIRE TRAIN/VAL/TEST ---
-    print("-" * 50)
-    print(" Impartire Dataset (Train / Val / Test)...")
+    center = (IMG_SIZE // 2, IMG_SIZE // 2)
     
-    create_dirs(TRAIN_DIR)
-    create_dirs(VAL_DIR)
-    create_dirs(TEST_DIR)
+    # 1. Forma de baza distorsionata
+    axes = (random.randint(8, 16), random.randint(6, 14))
+    angle = random.randint(0, 360)
+    cv2.ellipse(img, center, axes, angle, 0, 360, 200, -1)
+    
+    # 2. Simulare 'Keyhole collapse' sau instabilitate (pete negre interne)
+    if random.random() > 0.5:
+        offset_x = random.randint(-5, 5)
+        offset_y = random.randint(-5, 5)
+        cv2.circle(img, (center[0]+offset_x, center[1]+offset_y), random.randint(2, 4), 0, -1)
 
-    for cls in classes:
-        src_path = os.path.join(PROCESSED_DIR, cls)
-        all_images = [f for f in os.listdir(src_path) if f.endswith(".png")]
-        
-        # Amestecam imaginile inainte de split
-        random.shuffle(all_images)
-        
-        # Split: 70% Train, 15% Val, 15% Test
-        train_imgs, test_val = train_test_split(all_images, test_size=0.3, random_state=42)
-        val_imgs, test_imgs = train_test_split(test_val, test_size=0.5, random_state=42)
-        
-        # Copiere efectiva
-        for f in train_imgs: shutil.copy2(os.path.join(src_path, f), os.path.join(TRAIN_DIR, cls, f))
-        for f in val_imgs:   shutil.copy2(os.path.join(src_path, f), os.path.join(VAL_DIR, cls, f))
-        for f in test_imgs:  shutil.copy2(os.path.join(src_path, f), os.path.join(TEST_DIR, cls, f))
-        
-        # --- AFISARE STATISTICI ---
-        print(f"\n Statistici Clasa {cls.upper()}:")
-        print(f"    Train: {len(train_imgs):<5} (Invatare)")
-        print(f"    Val:   {len(val_imgs):<5} (Verificare in timpul invatarii)")
-        print(f"    Test:  {len(test_imgs):<5} (Evaluare finala)")
-        print(f"    Total: {len(all_images)}")
+    # 3. Simulare 'Spatter' (stropi metalici in jur)
+    for _ in range(random.randint(3, 8)):
+        spat_x = random.randint(10, IMG_SIZE-10)
+        spat_y = random.randint(10, IMG_SIZE-10)
+        # Ne asiguram ca nu e chiar in centru
+        if abs(spat_x - center[0]) > 10 or abs(spat_y - center[1]) > 10:
+            cv2.circle(img, (spat_x, spat_y), 1, 255, -1)
 
-    print("-" * 50)
-    print(" Procesare completa! Datele sunt gata de antrenare.")
+    # 4. Deformare contur (simulare suprafata rugoasa)
+    # Desenam un poligon aleator peste elipsa
+    pts = np.array([[random.randint(20, 44), random.randint(20, 44)] for _ in range(5)], np.int32)
+    pts = pts.reshape((-1, 1, 2))
+    cv2.polylines(img, [pts], True, 0, 1)
+
+    img = cv2.GaussianBlur(img, (3, 3), 0)
+    img = add_noise(img)
+    
+    # Salvare
+    path = os.path.join(RAW_DATA_DIR, "defect", f"defect_{index}.png")
+    cv2.imwrite(path, img)
+
+def main():
+    print(f"[INFO] Generare dataset sintetic in: {RAW_DATA_DIR}")
+    print(f"[INFO] Target: {SAMPLES_PER_CLASS} imagini per clasa.")
+    
+    for i in range(SAMPLES_PER_CLASS):
+        generate_stable_meltpool(i)
+        generate_unstable_meltpool(i)
+        
+        if (i+1) % 500 == 0:
+            print(f" -> Generat {i+1} / {SAMPLES_PER_CLASS} perechi...")
+            
+    print("[OK] Generare completa.")
 
 if __name__ == "__main__":
-    process_and_split()
+    main()
